@@ -4,17 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        a {
+            display: inline-block;
+            margin: 10px;
+            padding: 10px 15px;
+            background-color: #007BFF;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        a:hover {
+            background-color: #0056b3;
+        }
+    </style>
 </head>
 <body>
     
-    <h1>Hello, {{ name }}!</h1>
-    <ul>
-            {% for user_name in names %}
-                Hello {{ user_name }}<br>
-            {% empty %}
-                <li>No users found.</li>
-            {% endfor %}
-    </ul>
+    <a href="/users">Users info</a>
+    <a href="/cities">Cities with times</a>
+    <a href="/counter">Counter</a>
+
 </body>
 
 <script>
