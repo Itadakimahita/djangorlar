@@ -22,7 +22,9 @@ DJANGO_AND_THIRD_PARTY_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 ]
-PROJECT_APPS = []
+PROJECT_APPS = [
+    "apps.apps.TasksConfig",
+]
 INSTALLED_APPS = DJANGO_AND_THIRD_PARTY_APPS + PROJECT_APPS
 
 # ------------------------
