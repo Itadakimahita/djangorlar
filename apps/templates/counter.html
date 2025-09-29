@@ -4,13 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    <script>
-        function increment(count){
-            return count + 1;
-        }
-    </script>
+    
 <body>
-    <button onclick={{counter.increment}}>+</button>
-    <h1>Counter: {{ counter.count }}</h1>
+    <h1 id="counter">{{ counter.count }}</h1>
+    <button onclick="{{counter.increment}}">Increment</button>
 </body>
 </html>
