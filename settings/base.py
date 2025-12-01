@@ -10,6 +10,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROOT_URLCONF = 'settings.urls'
 WSGI_APPLICATION = 'settings.wsgi.application'
 ASGI_APPLICATION = 'settings.wsgi.application'
+AUTH_USER_MODEL = 'user.CustomUser'
 
 # ------------------------
 # Apps
@@ -21,10 +22,15 @@ DJANGO_AND_THIRD_PARTY_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'drf_spectacular',
+    'debug_toolbar',
+    'django_extensions',
 ]
 PROJECT_APPS = [
-    'apps.user',
-    'apps.course',
+    'apps.user.apps.UserConfig',
+    'apps.course.apps.CourseConfig',
 ]
 INSTALLED_APPS = DJANGO_AND_THIRD_PARTY_APPS + PROJECT_APPS
 
@@ -39,6 +45,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 TEMPLATES = [
     {
@@ -47,6 +54,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
@@ -68,7 +76,6 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-
 
 # ------------------------
 # Internationalization 
