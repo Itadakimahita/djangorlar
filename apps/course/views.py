@@ -2,9 +2,10 @@
 from typing import Any
 
 # Django modules
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import HttpRequest, HttpResponse
 from django.db.models import QuerySet, Count
+from django.db import models
 
 # Django REST Framework
 from rest_framework.viewsets import ViewSet
@@ -21,22 +22,40 @@ from rest_framework.status import (
 from rest_framework.decorators import action
 
 from apps.course.models import Course, Lessons
+from apps.user.models import CustomUser
 from apps.course.serializers import (
-    CourseBaseSerializer,
+    CourseSerializer,
     CourseListSerializer,
     CourseCreateSerializer,   
     CourseUpdateSerializer,
-    ListListSerializer,
-    ListCreateSerializer,
+    LessonSerializer,
 )
+from apps.course.permission import IsOwner
 
 class CourseViewSet(ViewSet):
     """
     ViewSet for handling Course-related endpoints.
     """
 
-    # permission_classes = (IsAuthenticated,)
-    serializer_class = CourseBaseSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+    serializer_class = CourseSerializer
+
+    # ---------------------- Helpers ----------------------
+    def get_course(self, id):
+        return get_object_or_404(
+            Course.objects.annotate(
+                lessons_count=models.Count("lessons")
+            ).prefetch_related("lessons"),
+            id=id
+        )
+
+    def get_permissions(self):
+        """Extra owner check for update, delete, activate, deactivate"""
+        if self.action in ["update", "destroy", "activate", "deactivate"]:
+            return [IsAuthenticated(), IsOwner()]
+        return [IsAuthenticated()]
+    
 
 
     def list(
@@ -126,8 +145,8 @@ class CourseViewSet(ViewSet):
                 A response indicating the result of the update operation.
         """
         try:
-            Course: Course = Course.objects.get(id=kwargs["pk"])
-        except Course.DoesNotExist:
+            course: Course = Course.objects.get(id=kwargs["pk"])
+        except course.DoesNotExist:
             return DRFResponse(
                 data={
                     "pk": [f"Course with id={kwargs['pk']} does not exist."]
@@ -137,7 +156,7 @@ class CourseViewSet(ViewSet):
 
         serializer: CourseUpdateSerializer = CourseUpdateSerializer(
             data=request.data,
-            instance=Course,
+            instance=course,
             partial=True,
         )
 
@@ -167,8 +186,8 @@ class CourseViewSet(ViewSet):
                 A response indicating the result of the deletion operation.
         """
         try:
-            Course: Course = Course.objects.get(id=kwargs["pk"])
-        except Course.DoesNotExist:
+            course: Course = Course.objects.get(id=kwargs["pk"])
+        except course.DoesNotExist:
             return DRFResponse(
                 data={
                     "pk": [f"Course with id={kwargs['pk']} does not exist."]
@@ -176,7 +195,7 @@ class CourseViewSet(ViewSet):
                 status=HTTP_404_NOT_FOUND
             )
 
-        Course.delete()
+        course.delete()
 
         return DRFResponse(
             status=HTTP_204_NO_CONTENT
@@ -187,7 +206,7 @@ class CourseViewSet(ViewSet):
         detail=True,
         url_name="Lists",
         url_path="Lists",
-        # permission_classes=(IsAuthenticated, IsUserInCourse,)
+        permission_classes=(IsAuthenticated,)
     )
     def get_Lists(self, request: DRFRequest, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> DRFResponse:
         """
@@ -217,7 +236,7 @@ class CourseViewSet(ViewSet):
         self.check_object_permissions(request=request, obj=Course)
 
         return DRFResponse(
-            data=ListListSerializer(
+            data=CourseListSerializer(
                 Course.Lists.prefetch_related("owner").all(),
                 many=True,
             ).data,
@@ -225,57 +244,77 @@ class CourseViewSet(ViewSet):
         )
 
     @action(
-        methods=("POST",),
-        detail=True,
-        url_name="create_List",
-        url_path="create-List",
-        permission_classes=(IsAuthenticated,),
+        detail=True, 
+        methods=["POST"],
+        url_path="activate",
+        url_name="activate_course",
     )
-    def create_List(self, request: DRFRequest, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> DRFResponse:
+    def activate(self, request: DRFRequest, id=None, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> DRFResponse:
         """
-        Handle POST requests to create a new List for a specific Course.
-
+        Handle POST requests to activate a Course.
+        
         Parameters:
             request: DRFRequest
                 The request object.
-            *args: list
-                Additional positional arguments.
-            **kwargs: dict
-                Additional keyword arguments.
+            id: int
+                The ID of the Course to activate.
+            
         Returns:
             DRFResponse
-                A response indicating the result of the List creation operation.
+                A response indicating the result of the activation operation, with course data
         """
-        try:
-            Course: Course = Course.objects.get(id=kwargs["pk"])
-        except Course.DoesNotExist:
-            return DRFResponse(
-                data={
-                    "id": [f"Course with id={kwargs['pk']} does not exist."]
-                },
-                status=HTTP_404_NOT_FOUND
-            )
+        course: Course = self.get_course(id)
+        self.check_object_permissions(request, course)
 
-        self.check_object_permissions(request=request, obj=Course)
+        if course.is_active:
+            return DRFResponse({"detail": "Course already active"}, status=HTTP_400_BAD_REQUEST)
+
+        course.is_active = True
+        course.save()
+        return DRFResponse(CourseSerializer(course).data)
 
 
-        serializer: ListCreateSerializer = ListCreateSerializer(
-            data=request.data,
-            context={
-                "pk": kwargs["pk"],
-                "request": request,
-            }
-        )
+    @action(
+        detail=True, 
+        methods=["POST"], 
+        url_path="deactivate",
+        url_name="deactivate_course",
+    )
+    def deactivate(self, request, id=None, *args: tuple[Any, ...], **kwargs: dict[str, Any]) -> DRFResponse:
+        """
+        Handle POST requests to deactivate a Course.
+        
+        Parameters:
+            request: DRFRequest
+                The request object.
+            id: int
+                The ID of the Course to deactivate.
+        
+        Returns:
+            DRFResponse
+                A response indicating the result of the deactivation operation, with course data
+        """
+        
+        course = self.get_course(id)
+        self.check_object_permissions(request, course)
 
-        serializer.is_valid(raise_exception=True)
+        if not course.is_active:
+            return DRFResponse({"detail": "Course already inactive"}, status=HTTP_400_BAD_REQUEST)
 
-        List: List = serializer.save()
-        UserList.objects.create(
-            List_id=List.id,
-            user_id=request.user.id,
-        )
+        course.is_active = False
+        course.save()
+        return DRFResponse(CourseSerializer(course).data)
 
-        return DRFResponse(
-            data=serializer.data,
-            status=HTTP_201_CREATED
-        )
+
+    @action(
+        detail=True, 
+        methods=["get"], 
+        url_path="lessons",
+        url_name="course_lessons",
+    )
+    def list_lessons(self, request, id=None):
+        course = self.get_course(id)
+
+        lessons = course.lessons.filter(deleted_at__isnull=True)
+        serializer = LessonSerializer(lessons, many=True)
+        return DRFResponse(serializer.data)

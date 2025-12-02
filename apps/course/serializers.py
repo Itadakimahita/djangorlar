@@ -3,7 +3,9 @@ from rest_framework.serializers import (
     ModelSerializer,
     SerializerMethodField,
     IntegerField,
-    Field
+    Field,
+    StringRelatedField,
+    
 )
 
 # Project modules
@@ -28,20 +30,29 @@ class CurrentPKURLDefault:
         return "%s()" % self.__class__.__name__
 
 
-class CourseBaseSerializer(ModelSerializer):
-    """
-    Base serializer for Course instances.
-    """
+class LessonSerializer(ModelSerializer):
+    """Lesson basic serializer"""
+    
+    class Meta:
+        model = Lessons
+        fields = ["id", "title", "content", "order", "indentation", "is_published"]
+
+
+class CourseSerializer(ModelSerializer):
+    """Course basic serializer"""
+    owner = StringRelatedField(read_only=True)
+    lessons_count = IntegerField(read_only=True)
 
     class Meta:
-        """
-        Customize the serializer's metadata.
-        """
         model = Course
-        fields = "__all__"
+        fields = ["id", "title", "description", "is_active", "owner", "lessons_count"]
+
+    def create(self, validated_data):
+        validated_data["owner"] = self.context["request"].user
+        return super().create(validated_data)
 
 
-class CourseListSerializer(CourseBaseSerializer):
+class CourseListSerializer(CourseSerializer):
     """
     Serializer for listing Course instances.
     """
@@ -78,7 +89,7 @@ class CourseListSerializer(CourseBaseSerializer):
         return getattr(obj, "users_count", 0)
 
 
-class CourseCreateSerializer(CourseBaseSerializer):
+class CourseCreateSerializer(CourseSerializer):
     """
     Serializer for creating Course instances.
     """
@@ -96,7 +107,7 @@ class CourseCreateSerializer(CourseBaseSerializer):
         )
 
 
-class CourseUpdateSerializer(CourseBaseSerializer):
+class CourseUpdateSerializer(CourseSerializer):
     """
     Serializer for updating Course instances.
     """
@@ -190,3 +201,14 @@ class LessonsCreateSerializer(LessonsBaseSerializer):
             "id",
             "course",
         )
+
+
+class CourseDetailSerializer(ModelSerializer):
+    """Serializer for detailed Course instances."""
+    
+    owner = StringRelatedField(read_only=True)
+    lessons = LessonSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Course
+        fields = ["id", "title", "description", "is_active", "owner", "lessons"]
